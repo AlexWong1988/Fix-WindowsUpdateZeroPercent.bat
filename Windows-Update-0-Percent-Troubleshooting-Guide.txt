@@ -1,0 +1,298 @@
+WINDOWS UPDATE STUCK AT 0% - COMPLETE TROUBLESHOOTING GUIDE
+================================================================
+
+QUICK FIX (Try First)
+--------------------
+1. Run Fix-WindowsUpdateZeroPercent.ps1 (PowerShell) or .bat (Command Prompt) as Administrator
+   - Stops and resets Windows Update services
+   - Clears update cache
+   - Automatically searches for available updates
+   - Automatically installs found updates
+   - Offers to restart computer when complete
+2. If updates were installed, allow the restart (or restart manually)
+3. Verify updates completed in Settings > Update & Security > Windows Update
+
+If successful, you're done! If not, continue below.
+
+
+DIAGNOSIS
+---------
+
+What the Fix Scripts Do Automatically
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When you run either script, it will:
+
+1. REPAIR PHASE:
+   • Stop Windows Update services (wuauserv, BITS, WaaSMedicSvc)
+   • Clear the Windows Update cache and temp files
+   • Reset BITS and DNS
+   • Restart all Windows Update services
+
+2. UPDATE CHECK PHASE (Automatic):
+   • Search for available updates using Windows Update COM interface
+   • Display all pending updates with their titles and descriptions
+   • Count total available updates
+
+3. INSTALLATION PHASE (Automatic):
+   • Create an update collection with all available updates
+   • Install updates using Windows Update Installer
+   • Monitor installation progress
+   • Report success/failure status
+
+4. COMPLETION:
+   • Offer to restart computer immediately (recommended)
+   • Provide next steps if restart is declined
+
+Why Automatic Installation?
+   • Ensures updates complete as soon as possible
+   • Reduces need for manual intervention
+   • Decreases "stuck at 0%" re-occurrence
+   • Ideal for corporate/Intune-managed devices
+
+
+Monitoring the Installation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+While the script installs updates, you'll see:
+   ✓ Success = Updates installed, optional restart
+   ⚠ Restart Required = Updates installed but reboot needed
+   ⚠ Some Failed = Some updates succeeded, some failed (check Event Viewer)
+
+The script will ask: "Restart computer now? (y/n)"
+   • Answer 'y' = Restarts in 30 seconds (press Ctrl+C to cancel)
+   • Answer 'n' = Continue on system, restart manually later
+
+
+Check Disk Space:
+  Open Command Prompt (admin) and type:
+    fsutil volume diskfree C:
+  
+  Minimum required: 500 MB free on C: drive for updates
+
+
+ADVANCED FIXES (In Order)
+--------------------------
+
+Troubleshooting if Automatic Update Installation Fails
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If the script finds updates but installation fails:
+
+1. Check the exact error code displayed
+2. Review Windows Update log:
+   Open PowerShell as Administrator:
+     Get-WindowsUpdateLog
+     
+   This creates WindowsUpdate.log in your user folder - open with Notepad
+
+3. Common installation failure causes:
+   • Antivirus blocking installation
+   • Corrupted update files
+   • Insufficient disk space (need 500MB+)
+   • COM object initialization failed
+   • Missing system prerequisites
+
+4. If installation fails, try these in order:
+
+   A) Retry immediately (updates may have been partially downloaded):
+      1. Close all applications
+      2. Run the fix script again
+      3. Allow installation to proceed
+
+   B) Clear update cache more aggressively:
+      1. Open Command Prompt as Administrator
+      2. Run: net stop wuauserv
+      3. Run: rmdir /S /Q C:\Windows\SoftwareDistribution\Download
+      4. Run: net start wuauserv
+      5. Run the fix script again
+
+   C) Disable antivirus temporarily during installation:
+      1. Temporarily disable Windows Defender or third-party antivirus
+      2. Run the fix script again
+      3. Re-enable antivirus after completion
+
+   D) Check for system file corruption (see Option D below)
+
+
+Option A: Reset Windows Update Agent Registry
+--------------------------------------------
+IMPORTANT: Back up registry first (Export HKEY_LOCAL_MACHINE to .reg file)
+
+1. Open Command Prompt as Administrator
+2. Run these commands (one at a time):
+
+    net stop wuauserv
+    net stop cryptsvc
+    net stop bits
+    net stop msiserver
+    
+    ren C:\Windows\SoftwareDistribution SoftwareDistribution.old
+    ren C:\Windows\System32\catroot2 catroot2.old
+    
+    net start cryptsvc
+    net start bits
+    net start msiserver
+    net start wuauserv
+
+3. Restart the computer
+
+
+Option B: Re-register Windows Update DLL Files
+---------------------------------------------
+Open Command Prompt as Administrator and run:
+
+    regsvr32.exe /s atl.dll
+    regsvr32.exe /s urlmon.dll
+    regsvr32.exe /s mshtml.dll
+    regsvr32.exe /s shdocvw.dll
+    regsvr32.exe /s browseui.dll
+    regsvr32.exe /s jscript.dll
+    regsvr32.exe /s vbscript.dll
+    regsvr32.exe /s scrrun.dll
+    regsvr32.exe /s msxml.dll
+    regsvr32.exe /s msxml3.dll
+    regsvr32.exe /s msxml6.dll
+    regsvr32.exe /s actxprxy.dll
+    regsvr32.exe /s softpub.dll
+    regsvr32.exe /s wintrust.dll
+    regsvr32.exe /s dssenh.dll
+    regsvr32.exe /s rsaenh.dll
+    regsvr32.exe /s gpkcsp.dll
+    regsvr32.exe /s sccbase.dll
+    regsvr32.exe /s slbcsp.dll
+    regsvr32.exe /s cryptdlg.dll
+    regsvr32.exe /s oleaut32.dll
+    regsvr32.exe /s ole32.dll
+    regsvr32.exe /s shell32.dll
+    regsvr32.exe /s initpki.dll
+    regsvr32.exe /s wucltui.dll
+    regsvr32.exe /s wuaueng.dll
+    regsvr32.exe /s wuaueng1.dll
+    regsvr32.exe /s wucltaux.dll
+    regsvr32.exe /s wudriver.dll
+    regsvr32.exe /s wups.dll
+    regsvr32.exe /s wups2.dll
+    regsvr32.exe /s wuweb.dll
+    regsvr32.exe /s qmgr.dll
+    regsvr32.exe /s qmgrprxy.dll
+    regsvr32.exe /s psisrndr.ax
+    regsvr32.exe /s vds.exe
+    regsvr32.exe /s pe.dll
+    regsvr32.exe /s appwiz.cpl
+    regsvr32.exe /s sl.dll
+
+Then run: net start wuauserv
+
+
+Option C: System File Checker Scan
+----------------------------------
+Open Command Prompt as Administrator:
+
+    sfc /scannow
+
+This will scan and repair corrupted system files. May require restart and take 15+ minutes.
+
+
+Option D: DISM Repair
+--------------------
+Open Command Prompt as Administrator:
+
+    DISM.exe /Online /Cleanup-Image /StartComponentCleanup
+    DISM.exe /Online /Cleanup-Image /RestoreHealth
+
+Then:
+    sfc /scannow
+
+
+Option E: Repair Windows Update via Windows Settings
+----------------------------------------------------
+1. Settings > Apps > Apps & Features
+2. Scroll down to "Windows Update Optional Features"
+3. Click it and select "Uninstall"
+4. Restart
+5. Settings > Apps > Apps & Features > Optional Features > Add a feature
+6. Search "Windows Update" and re-enable
+
+
+NUCLEAR OPTION (Last Resort)
+----------------------------
+If nothing else works, use Windows Media Creation Tool for in-place repair:
+
+1. Download Windows Media Creation Tool from Microsoft
+2. Run it and select "Repair your computer"
+3. Choose your Windows version and language
+4. Follow the prompts (keeps your files and settings)
+
+This performs a clean install without losing data.
+
+
+PREVENTING FUTURE STUCK UPDATES
+-------------------------------
+• Keep at least 500 MB free on C: drive
+• Ensure antivirus is not blocking Windows Update
+• Disable VPN during updates
+• Don't force-shutdown during updates
+• Ensure all drivers are up to date
+• Consider scheduling updates for off-hours
+• On corporate networks: check proxy settings aren't interfering
+
+
+CORPORATE/INTUNE CONSIDERATIONS
+-------------------------------
+If on Microsoft Intune (relevant for LLSG):
+
+1. Check Intune compliance:
+   Settings > Accounts > Access work or school > [Your account] > Info > Sync
+
+2. Verify Windows Update for Business policies haven't paused updates:
+   Settings > Update & Security > Windows Update > Pause updates
+
+3. Check Group Policy conflicts (if domain-joined):
+   gpresult /h report.html  (open report.html in browser)
+
+4. Force policy refresh:
+   gpupdate /force /boot
+
+5. Contact Intune admin to check:
+   • Device compliance policies
+   • Configuration profiles
+   • Feature update policies
+
+
+USEFUL POWERSHELL COMMANDS FOR DIAGNOSTICS
+-------------------------------------------
+Run in PowerShell as Administrator:
+
+Get update history:
+    Get-WmiObject -Class Win32_QuickFixEngineering | Sort-Object InstalledOn -Descending
+
+Check Windows Update health:
+    Get-WindowsUpdateLog
+
+View WU configuration:
+    (New-Object -ComObject Microsoft.Update.ServiceManager).Services
+
+Force immediate scan:
+    (New-Object -ComObject Microsoft.Update.AutoUpdate).DetectNow()
+
+Check update status:
+    $UpdateSession = New-Object -ComObject Microsoft.Update.Session
+    $UpdateSearcher = $UpdateSession.CreateupdateSearcher()
+    $SearchResult = $UpdateSearcher.Search("IsInstalled=0")
+    $SearchResult.Updates | Select-Object Title, Description
+
+
+CONTACT ESCALATION
+------------------
+If still stuck after trying all options:
+1. Note the error code from Event Viewer
+2. Check Windows Update support at: https://support.microsoft.com/en-us/windows
+3. For LLSG: contact Digital Services team with error code
+4. For enterprise: contact Microsoft Support with error code and systeminfo output
+
+Get full system info:
+    systeminfo > systeminfo.txt
+    (attach to support ticket)
+
+
+Last updated: 2026-05-02
+For LLSG Digital Services
